@@ -8,6 +8,17 @@ One way to approach this is by checking all possible combinations of truth value
 
 Can you list all 8 combinations of a, b, and c?
 
+|a|b|c|
+-------
+|T|T|T|
+|T|T|F|
+|T|F|T|
+|T|F|F|
+|F|T|T|
+|F|T|F|
+|F|F|T|
+|F|F|F|
+
 In general, for n variables, there will be 2^n possible assignments, so the approach of "trying everything" is not efficient for large n. In fact, this is the SAT ("satisfiability") problem, which is NP-complete, meaning that it is "one of the hardest problems to which solutions can be verified quickly. But this difficult problem is exactly what tools like the Z3 SMT solver! Here’s how we can solve the problem using the Z3:
 """
 def boolean_expressions():
@@ -124,8 +135,7 @@ def proof_by_unsat():
     # y>0 => x+y > x
     x,y = Ints('x y')
     s = Solver()
-
-    # TODO: YOUR CODE HERE
+    s.add(Not(Or(Not(y > 0), (x + y > x))))
 
     match s.check():
         case z3.unsat:
@@ -143,8 +153,14 @@ def demorgans_proof():
         """
         Print "No counterexample can be found, therefore the statement is true" if the given formula f is true, otherwise print "The formula f is false, with counterexample given by: " and the model that shows the formula to be false.
         """
-        # TODO: YOUR CODE HERE
-        pass
+        
+        s = Solver()
+        s.add(Not(f))
+        match s.check():
+            case z3.sat:
+                print("The formula f is false, with counterexample given by:", s.model())
+            case z3.unsat:
+                print("No counterexample can be found, therefore the statement is true")
 
     prove(demorgan)
 
@@ -175,8 +191,34 @@ def wedding_planning():
     or
         "There is no acceptable seating arraignment"
     """
-    #TODO: YOUR CODE HERE
+    s = Solver()
+    a, b, c = Ints('a b c')
+    people = [a, b, c]
+    s.add(Distinct(people))
+    for person in people:
+        s.add(person >= 1, person <= 3)
 
+    # Alice not next to Charlie
+    s.add(a - c != -1)
+    s.add(a - c != 1)
+
+    # Alice not in leftmost
+    s.add(a != 1)
+
+    # Bob not to right of Charlie
+    s.add(b < c)
+
+    pos_dict = {1:'on the left', 2:'in the middle', 3:'on the right'}
+
+    match s.check():
+        case z3.unsat:
+            print("There is no acceptable seating arraignment")
+        case z3.sat:
+            model = s.model()
+            print(f'Alice sits {pos_dict[model.evaluate(a).as_long()]},',
+                  f'Bob {pos_dict[model.evaluate(b).as_long()]},',
+                  f'and Charlie {pos_dict[model.evaluate(c).as_long()]}')
+    
 
 
 
@@ -198,12 +240,37 @@ def print_sudoku(grid):
 
 
 def sudoku(puzzle):
+    s = Solver()
+    puzzle_list = []
+    for row in range(9):
+        puzzle_list.append([])
+        for col in range(9):
+            puzzle_list[row].append(Int(str(row+1)+','+str(col+1)))
+            if puzzle[row][col] != 0:
+                s.add(puzzle_list[row][col] == puzzle[row][col])
+            else:
+                s.add(puzzle_list[row][col] >= 1, puzzle_list[row][col] <= 9)
+    
+    for i in range(9):
+        # rows
+        s.add(Distinct(puzzle_list[i]))
+        # columns
+        s.add(Distinct([sub[i] for sub in puzzle_list]))
 
-    """
-    Use print_sudoku to print your solution to puzzle or otherwise print "The puzzle is impossible.".
-    """
-    #TODO: YOUR CODE HERE
+    # boxes
+    for i in [0, 3, 6]:
+        for j in [0, 3, 6]:
+            s.add(Distinct(puzzle_list[i  ][j:j+3]+\
+                           puzzle_list[i+1][j:j+3]+\
+                           puzzle_list[i+2][j:j+3]))
 
+    match s.check():
+        case z3.sat:
+            # Used Codex for help getting proper format to print 
+            model = s.model()
+            print_sudoku([[model.evaluate(puzzle_list[row][col]) for col in range(9)] for row in range(9)])
+        case z3.unsat:
+            print("The puzzle is impossible.")
 
 
 instance = ((0,0,0,0,9,4,0,3,0),
@@ -230,11 +297,37 @@ The question is: How many ways can $2 be made using any number of coins?
 
 def coin_sum(total):
     # Variables for the numbers of each coin denomination
-    p,n,d,q,f,d = Ints('p n d q f d')
+    p,n,di,q,f,do = Ints('p n di q f do')
+    coins = [p, n, di, q, f, do]
 
     """
     Print the number of ways the $2 can be made using any number of the above coins.
 
     Hint: You may need to run many related but slightly different model checks.
     """
-    # TODO: YOUR CODE HERE
+    s = Solver()
+    for coin in coins:
+        s.add(coin >= 0)
+    s.add(total == p + 5*n + 10*di + 25*q + 50*f + 100*do)
+
+    counter = 0
+    while s.check() == z3.sat:
+        counter += 1
+        block = Not(And([
+            v == s.model().evaluate(v, model_completion=True)
+            for v in [p, n, di, q, f, do]
+        ]))
+        s.add(block)
+            
+    
+    print(counter)
+
+boolean_expressions()
+integer_expressions()
+real_artithmetic()
+integer_overflow()
+proof_by_unsat()
+demorgans_proof()
+sudoku(instance)
+wedding_planning()
+coin_sum(200)
