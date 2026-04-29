@@ -297,8 +297,8 @@ The question is: How many ways can $2 be made using any number of coins?
 
 def coin_sum(total):
     # Variables for the numbers of each coin denomination
-    p,n,di,q,f,do = Ints('p n di q f do')
-    coins = [p, n, di, q, f, do]
+    p,n,d,q,f,c = Ints('p n d q f c')
+    coins = [p, n, d, q, f, c]
 
     """
     Print the number of ways the $2 can be made using any number of the above coins.
@@ -308,14 +308,14 @@ def coin_sum(total):
     s = Solver()
     for coin in coins:
         s.add(coin >= 0)
-    s.add(total == p + 5*n + 10*di + 25*q + 50*f + 100*do)
+    s.add(total == p + 5*n + 10*d + 25*q + 50*f + 100*c)
 
     counter = 0
     while s.check() == z3.sat:
         counter += 1
         block = Not(And([
             v == s.model().evaluate(v, model_completion=True)
-            for v in [p, n, di, q, f, do]
+            for v in [p, n, d, q, f, c]
         ]))
         s.add(block)
             
